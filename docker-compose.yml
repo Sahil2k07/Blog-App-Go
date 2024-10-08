@@ -1,0 +1,51 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_blog_db
+    volumes:
+      - mysql_data:/var/lib/mysql
+    environment:
+      MYSQL_DATABASE: blog_db
+      MYSQL_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: password
+    ports:
+      - "3308:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "0.0.0.0"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: Blog_App_Go
+    environment:
+      PORT: 0.0.0.0:5000
+      JWT_SECRET: GoAppSecret
+      ALLOWED_ORIGINS: "*"
+      MYSQL_URL: root:password@tcp(mysql:3306)/blog_db
+      CLOUD_NAME: ${CLOUD_NAME}
+      API_KEY: ${API_KEY}
+      API_SECRET: ${API_SECRET}
+      FOLDER_NAME: ${FOLDER_NAME}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_USER: ${MAIL_USER}
+      MAIL_PASS: ${MAIL_PASS}
+    ports:
+      - "5000:5000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: >
+      sh -c "
+      cd src/database/migrations &&
+      goose mysql 'root:password@tcp(mysql:3306)/blog_db' up &&
+      cd ../../../ &&
+      go build -o main . &&
+      ./main
+      "
+
+volumes:
+  mysql_data:
